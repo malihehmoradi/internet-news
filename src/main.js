@@ -1,23 +1,23 @@
-import { Client, ID } from "node-appwrite";
-import OpenAI from "openai";
-import { getStaticFile, throwIfMissing } from "./utils.js";
-import { Databases } from "node-appwrite";
-import { fetch } from "undici";
+import { Client, ID } from 'node-appwrite';
+import OpenAI from 'openai';
+import { getStaticFile, throwIfMissing } from './utils.js';
+import { Databases } from 'node-appwrite';
+import { fetch } from 'undici';
 
 /**
  * Main Appwrite Function Handler
  * @returns {Object} Response object
  */
 export default async ({ req, res, log, error }) => {
-  throwIfMissing(process.env, ["OPENAI_API_KEY"]);
+  throwIfMissing(process.env, ['OPENAI_API_KEY']);
 
   try {
-    log("🚀 Starting Iran Internet Report Generation...");
+    log('🚀 Starting Iran Internet Report Generation...');
 
     /* ---------------- 1. Initialize Appwrite Client ---------------- */
     const client = new Client()
       .setEndpoint(
-        process.env.APPWRITE_ENDPOINT ?? "https://cloud.appwrite.io/v1",
+        process.env.APPWRITE_ENDPOINT ?? 'https://cloud.appwrite.io/v1'
       )
       .setProject(process.env.APPWRITE_PROJECT_ID)
       .setKey(process.env.APPWRITE_API_KEY);
@@ -25,64 +25,50 @@ export default async ({ req, res, log, error }) => {
     const databases = new Databases(client);
 
     /* ---------------- 2. Collect Data with Serper ---------------- */
-    log("📊 Fetching data from Serper AI...");
-    const pplxResponse = await fetch(
-      "https://google.serper.dev/search",
-      {
-        method: "POST",
-        headers: {
-          "X-API-KEY": `Bearer ${process.env.SERPER_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "sonar-pro",
-          messages: [
-            {
-              role: "system",
-              content:
-                "You are a data collector specializing in internet infrastructure and statistics.",
-            },
-            {
-              role: "user",
-              content:
-                "Collect the latest factual data about internet situation in Iran with statistics, sources, and recent developments.",
-            },
-          ],
-          temperature: 0.2,
-          max_tokens: 2000,
-        }),
+    log('📊 Fetching data from Serper AI...');
+    const serperResponse = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': `Bearer ${process.env.SERPER_API_KEY}`,
+        'Content-Type': 'application/json',
       },
-    );
+      body: JSON.stringify({
+        q: 'جدیدترین داده‌های واقعی درباره وضعیت اینترنت در ایران را با آمار، منابع و تحولات اخیر جمع‌آوری کنید.',
+        gl: 'ir',
+        hl: 'fa',
+        tbs: 'qdr:w',
+      }),
+    });
 
-    if (!pplxResponse.ok) {
-      throw new Error(`Perplexity API Error: ${pplxResponse.status}`);
+    if (!serperResponse.ok) {
+      throw new Error(`Serper API Error: ${serperResponse.status}`);
     }
 
-    const pplxData = await pplxResponse.json();
+    const pplxData = await serperResponse.json();
     const rawData = pplxData.choices[0].message.content;
-    log("✅ Data collected successfully");
+    log('✅ Data collected successfully');
 
     /* ---------------- 3. Analyze with OpenAI (ChatGPT) ---------------- */
-    log("🤖 Analyzing data with ChatGPT...");
+    log('🤖 Analyzing data with ChatGPT...');
 
     const gptResponse = await fetch(
-      "https://api.openai.com/v1/chat/completions",
+      'https://api.openai.com/v1/chat/completions',
       {
-        method: "POST",
+        method: 'POST',
         headers: {
           Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: "gpt-4o-mini",
+          model: 'gpt-4o-mini',
           messages: [
             {
-              role: "system",
+              role: 'system',
               content:
-                "You are a professional data analyst. Create concise, actionable reports in Persian suitable for Telegram channels.",
+                'You are a professional data analyst. Create concise, actionable reports in Persian suitable for Telegram channels.',
             },
             {
-              role: "user",
+              role: 'user',
               content: `
 تحلیل داده‌های زیر و تولید:
 1️⃣ 5 نکته کلیدی (به فارسی)
@@ -99,7 +85,7 @@ ${rawData}
           temperature: 0.3,
           max_tokens: 1500,
         }),
-      },
+      }
     );
 
     if (!gptResponse.ok) {
@@ -108,15 +94,15 @@ ${rawData}
 
     const gptData = await gptResponse.json();
     const analysis = gptData.choices[0].message.content;
-    log("✅ Analysis completed");
+    log('✅ Analysis completed');
 
     /* ---------------- 4. GENERATE FINAL REPORT ---------------- */
-    const persianDate = new Date().toLocaleDateString("fa-IR", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
+    const persianDate = new Date().toLocaleDateString('fa-IR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
     });
 
     const finalReport = `
@@ -130,39 +116,39 @@ ${analysis}
 `;
 
     /* ---------------- 5. SAVE TO DATABASE ---------------- */
-    log("💾 Saving to database...");
+    log('💾 Saving to database...');
 
     const document = await databases.createDocument(
       process.env.APPWRITE_DB_ID,
       process.env.APPWRITE_COLLECTION_ID,
-      "unique()",
+      'unique()',
       {
-        topic: "Internet in Iran",
+        topic: 'Internet in Iran',
         raw_data: rawData.substring(0, 10000), // Limit length
         analysis: analysis.substring(0, 5000),
         final_report: finalReport,
         created_at: new Date().toISOString(),
-        status: "published",
-      },
+        status: 'published',
+      }
     );
 
     log(`✅ Document created: ${document.$id}`);
 
     /* ---------------- 6. SEND TO TELEGRAM ---------------- */
-    log("📤 Sending to Telegram...");
+    log('📤 Sending to Telegram...');
 
     const telegramResponse = await fetch(
       `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
       {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chat_id: process.env.TELEGRAM_CHANNEL_ID,
           text: finalReport,
-          parse_mode: "HTML",
+          parse_mode: 'HTML',
           disable_web_page_preview: false,
         }),
-      },
+      }
     );
 
     if (!telegramResponse.ok) {
@@ -170,12 +156,12 @@ ${analysis}
       throw new Error(`Telegram API Error: ${telegramError}`);
     }
 
-    log("✅ Report sent to Telegram successfully");
+    log('✅ Report sent to Telegram successfully');
 
     /* ---------------- 7. Return Success Response ---------------- */
     return res.json({
       success: true,
-      message: "✅ گزارش با موفقیت تولید و ارسال شد",
+      message: '✅ گزارش با موفقیت تولید و ارسال شد',
       document_id: document.$id,
       timestamp: new Date().toISOString(),
     });
@@ -189,7 +175,7 @@ ${analysis}
         error: err.message,
         timestamp: new Date().toISOString(),
       },
-      500,
+      500
     );
   }
 };
