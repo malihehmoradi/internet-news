@@ -41,14 +41,10 @@ export default async ({req, res, log, error}) => {
         };
 
         const serperResponse = await fetch("https://google.serper.dev/search", requestOptions)
-            .then((response) => response.text())
-            .then((result) => console.log(result))
-            .catch((error) => console.error(error));
 
-
-        // if (!serperResponse.ok) {
-        //     throw new Error(`Serper API Error: ${serperResponse.status}`);
-        // }
+        if (!serperResponse.ok) {
+            throw new Error(`Serper API Error: ${serperResponse.status}`);
+        }
 
         const serperData = await serperResponse.json();
         let rawData = ""
