@@ -51,7 +51,7 @@ export default async ({req, res, log, error}) => {
         // }
 
         const serperData = await serperResponse.json();
-        const rawData = serperData.choices[0].message.content;
+        const rawData = serperData.organic
         log('✅ Data collected successfully');
 
         /* ---------------- 3. Analyze with OpenAI (ChatGPT) ---------------- */
@@ -82,7 +82,7 @@ export default async ({req, res, log, error}) => {
 3️⃣ آمار و ارقام مهم
 
 داده‌ها:
-${rawData}
+${rawData.toString()}
 
 خروجی باید کاملاً فارسی و مناسب کانال تلگرام باشد.
 `,
