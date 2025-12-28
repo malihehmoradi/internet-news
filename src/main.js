@@ -1,12 +1,14 @@
-import {Client, ID} from 'node-appwrite';
+import {Client} from 'node-appwrite';
 import {Databases} from 'node-appwrite';
 import {fetch} from 'undici';
+import ScrapingBee from "./dataCollections/ScrapingBee.js";
+import openAI from "./analyzors/OpenAI.js";
 
 /**
  * Main Appwrite Function Handler
  * @returns {Object} Response object
  */
-export default async ({req, res, log, error}) => {
+export default async ({ res, log, error}) => {
     try {
         log('🚀 Starting Iran Internet Report Generation...');
 
@@ -22,83 +24,15 @@ export default async ({req, res, log, error}) => {
 
         /* ---------------- 2. Collect Data with Serper ---------------- */
         log('📊 Fetching data from Serper AI...');
-        const myHeaders = new Headers();
-        myHeaders.append("X-API-KEY", "1a9b0912d4a768584668a9d2c2221e4e5e95db9f");
-        myHeaders.append("Content-Type", "application/json");
 
-        const raw = JSON.stringify({
-            "q": "جدیدترین داده‌های واقعی درباره وضعیت اینترنت در ایران را با آمار، منابع و تحولات اخیر جمع‌آوری کنید.",
-            "gl": "ir",
-            "hl": "fa",
-            "tbs": "qdr:w"
-        });
+        let rawData = await ScrapingBee();
 
-        const requestOptions = {
-            method: "POST",
-            headers: myHeaders,
-            body: raw,
-            redirect: "follow"
-        };
-
-        const serperResponse = await fetch("https://google.serper.dev/search", requestOptions)
-
-        if (!serperResponse.ok) {
-            throw new Error(`Serper API Error: ${serperResponse.status}`);
-        }
-
-        const serperData = await serperResponse.json();
-        let rawData =serperData.organic.toString()
-        // for (let i in serperData.organic) {
-        //     rawData += i.title + " " + i.snippet + " " + i.date
-        // }
-        log('✅ Data collected successfully '+ rawData);
+        log('✅ Data collected successfully ' + rawData);
 
         /* ---------------- 3. Analyze with OpenAI (ChatGPT) ---------------- */
         log('🤖 Analyzing data with ChatGPT...');
 
-        const gptResponse = await fetch(
-            'https://api.openai.com/v1/chat/completions',
-            {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    model: 'gpt-4o-mini',
-                    messages: [
-                        {
-                            role: 'system',
-                            content:
-                                'You are a professional data analyst. Create concise, actionable reports in Persian suitable for Telegram channels.',
-                        },
-                        {
-                            role: 'user',
-                            content: `
-تحلیل داده‌های زیر و تولید:
-1️⃣ 5 نکته کلیدی (به فارسی)
-2️⃣ گزارش خلاصه برای تلگرام
-3️⃣ آمار و ارقام مهم
-
-داده‌ها:
-${rawData}
-
-خروجی باید کاملاً فارسی و مناسب کانال تلگرام باشد.
-`,
-                        },
-                    ],
-                    temperature: 0.3,
-                    max_tokens: 1500,
-                }),
-            }
-        );
-
-        if (!gptResponse.ok) {
-            throw new Error(`OpenAI API Error: ${gptResponse.status}`);
-        }
-
-        const gptData = await gptResponse.json();
-        const analysis = gptData.choices[0].message.content;
+        const analysis = await openAI(rawData)
         log('✅ Analysis completed');
 
         /* ---------------- 4. GENERATE FINAL REPORT ---------------- */
@@ -158,7 +92,7 @@ ${analysis}
 
         if (!telegramResponse.ok) {
             const telegramError = await telegramResponse.text();
-            throw new Error(`Telegram API Error: ${telegramError}`);
+            log (`Telegram API Error: ${telegramError}`);
         }
 
         log('✅ Report sent to Telegram successfully');

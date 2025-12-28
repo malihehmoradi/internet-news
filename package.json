@@ -4,7 +4,10 @@
   "description": "",
   "main": "src/main.js",
   "scripts": {
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test": "node --watch src/test.js",
+    "dev": "node --watch src/main.js",
+    "debug": "node --inspect src/main.js"
   },
   "keywords": [],
   "author": "",
