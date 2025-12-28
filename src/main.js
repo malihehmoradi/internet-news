@@ -2,7 +2,7 @@ import {Client} from 'node-appwrite';
 import {Databases} from 'node-appwrite';
 import {fetch} from 'undici';
 import ScrapingBee from "./dataCollections/ScrapingBee.js";
-import openAI from "./analyzors/OpenAI.js";
+import Gemini from "./analyzors/Gemini.js";
 
 /**
  * Main Appwrite Function Handler
@@ -32,7 +32,7 @@ export default async ({ res, log, error}) => {
         /* ---------------- 3. Analyze with OpenAI (ChatGPT) ---------------- */
         log('🤖 Analyzing data with ChatGPT...');
 
-        const analysis = await openAI(rawData)
+        const analysis = await Gemini(rawData)
         log('✅ Analysis completed');
 
         /* ---------------- 4. GENERATE FINAL REPORT ---------------- */
